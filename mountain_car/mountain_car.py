@@ -50,9 +50,12 @@ W1 = tf.get_variable("W1", shape=[D, H],
            initializer=tf.contrib.layers.xavier_initializer())
 # rectified linear unit
 layer1 = tf.nn.relu(tf.matmul(observations,W1))
-W2 = tf.get_variable("W2", shape=[H, 1],
+W2 = tf.get_variable("W2", shape=[H, H],
            initializer=tf.contrib.layers.xavier_initializer())
-score = tf.matmul(layer1,W2)
+layer2 = tf.nn.relu(tf.matmul(layer1, W2))
+W3 = tf.get_variable("W3", shape=[H, 1],
+           initializer=tf.contrib.layers.xavier_initializer())
+score = tf.matmul(layer2,W3)
 probability = tf.nn.sigmoid(score)
 
 #From here we define the parts of the network needed for learning a good policy.
@@ -70,7 +73,8 @@ newGrads = tf.gradients(loss,tvars)
 adam = tf.train.AdamOptimizer(learning_rate=learning_rate) # Our optimizer
 W1Grad = tf.placeholder(tf.float32,name="batch_grad1") # Placeholders to send the final gradients through when we update.
 W2Grad = tf.placeholder(tf.float32,name="batch_grad2")
-batchGrad = [W1Grad,W2Grad]
+W3Grad = tf.placeholder(tf.float32,name="batch_grad3")
+batchGrad = [W1Grad, W2Grad, W3Grad]
 updateGrads = adam.apply_gradients(zip(batchGrad,tvars))
 
 def discount_rewards(r):
@@ -129,7 +133,7 @@ with tf.Session() as sess:
 
         # Rendering the environment slows things down,
         # so let's only look at it once our agent is doing a good job.
-        if episode_number > 500 or rendering == True :
+        if episode_number > 50 or rendering == True :
             env.render()
             rendering = True
 
@@ -196,7 +200,7 @@ with tf.Session() as sess:
                 gradBuffer[ix] += grad
             # If we have completed enough episodes, then update the policy network with our gradients.
             if episode_number % batch_size == 0:
-                sess.run(updateGrads,feed_dict={W1Grad: gradBuffer[0],W2Grad:gradBuffer[1]})
+                sess.run(updateGrads,feed_dict={W1Grad: gradBuffer[0],W2Grad:gradBuffer[1], W3Grad:gradBuffer[2]})
                 for ix,grad in enumerate(gradBuffer):
                     gradBuffer[ix] = grad * 0
 
