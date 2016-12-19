@@ -11,26 +11,11 @@ env = gym.make('MountainCar-v0')
 # action = 0, 1, or 2
 # reward = -1, presumably 1 if we cross the flag
 
-# Random actions :)
-#env.reset()
-#random_episodes = 0
-#reward_sum = 0
-#while random_episodes < 10:
-#    env.render()
-#    observation, reward, done, _ = env.step(np.random.randint(0,2))
-#    print observation, reward, done
-#    reward_sum += reward
-#    if done:
-#        random_episodes += 1
-#        print "Reward for this episode was:",reward_sum
-#        reward_sum = 0
-#        env.reset()
-
 # hyperparameters
 H = 10 # number of hidden layer neurons
-batch_size = 10 # every how many episodes to do a param update?
-learning_rate = 1e-2 # feel free to play with this to train faster or more stably.
-gamma = 0.96 # discount factor for reward
+batch_size = 30 # every how many episodes to do a param update?
+learning_rate = 1e-1 # feel free to play with this to train faster or more stably.
+gamma = 0.99 # discount factor for reward
 
 D = 2 # input dimensionality
 
@@ -107,7 +92,7 @@ running_reward = None
 reward_sum = 0
 episode_number = 1
 total_episodes = 1000
-MAX_STAGNANT_TICKS = 200
+MAX_STAGNANT_TICKS = 500
 init = tf.initialize_all_variables()
 
 ticks = 0
@@ -133,7 +118,7 @@ with tf.Session() as sess:
 
         # Rendering the environment slows things down,
         # so let's only look at it once our agent is doing a good job.
-        if episode_number > 50 or rendering == True :
+        if episode_number > 500 or rendering == True :
             env.render()
             rendering = True
 
