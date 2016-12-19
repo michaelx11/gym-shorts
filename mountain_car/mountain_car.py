@@ -16,6 +16,8 @@ H = 10 # number of hidden layer neurons
 batch_size = 30 # every how many episodes to do a param update?
 learning_rate = 1e-1 # feel free to play with this to train faster or more stably.
 gamma = 0.99 # discount factor for reward
+MAX_STAGNANT_TICKS = 500
+VELOCITY_WINDOW = 100
 
 D = 2 # input dimensionality
 
@@ -62,37 +64,48 @@ W3Grad = tf.placeholder(tf.float32,name="batch_grad3")
 batchGrad = [W1Grad, W2Grad, W3Grad]
 updateGrads = adam.apply_gradients(zip(batchGrad,tvars))
 
-def discount_rewards(r):
+def window_rms(a, window_size):
+  a2 = np.power(a,2)
+  window = np.ones(window_size)/float(window_size)
+  return np.sqrt(np.convolve(a2, window, 'valid'))
+
+def discount_rewards(r, input_x):
     """ take 1D float array of rewards and compute discounted reward """
     discounted_r = np.zeros_like(r)
+    velocities = input_x[:,1]
+    rms_velocities = window_rms(velocities, VELOCITY_WINDOW)
     running_add = 0
     for t in reversed(xrange(0, r.size)):
-        running_add = running_add * gamma + 1 # all bad always
+        running_add = running_add * gamma + 10.0 / MAX_STAGNANT_TICKS # all bad always
         discounted_r[t] = running_add
+    # but velocity is good
+    for t in xrange(r.size):
+        discounted_r[t] -= rms_velocities[min(len(rms_velocities) - 1, t)]
     return discounted_r
 
 # if we're legitimately done, counts as zero loss
-def zero_loss(r):
-    return np.zeros_like(r)
-
-#def reward_velocities(input_y):
-#    SCALE = 10.0
-#    """ take 1D float array of rewards and compute discounted reward """
-#    velocities = input_y[:,1]
-#    print velocities
-#    discounted_r = np.zeros_like(velocities)
-#    running_add = 0
-#    for t in reversed(xrange(0, velocities.size)):
-#        running_add = running_add + abs(SCALE * velocities[t])
-#        discounted_r[t] = running_add
-#    return discounted_r
+def rms_reward(r, input_x):
+    # Here we structure the rewards such that:
+    # 1. encourage shorter runs
+    # 2. encourage the most recent actions (they led us to winning!)
+    # 3. reward for high RMS velocity
+    weighted_r = np.zeros_like(r)
+    num_ticks = r.size
+    velocities = input_x[:,1]
+    rms_velocities = window_rms(velocities, VELOCITY_WINDOW)
+    running_add = -1.0 / num_ticks
+    for t in reversed(xrange(0, r.size)):
+        running_add *= gamma
+        weighted_r[t] = running_add
+    for t in xrange(r.size):
+        weighted_r[t] -= rms_velocities[min(len(rms_velocities) - 1, t)]
+    return weighted_r
 
 xs,hs,dlogps,drs,ys,tfps = [],[],[],[],[],[]
 running_reward = None
 reward_sum = 0
 episode_number = 1
-total_episodes = 1000
-MAX_STAGNANT_TICKS = 500
+total_episodes = 10000
 init = tf.initialize_all_variables()
 
 ticks = 0
@@ -118,7 +131,7 @@ with tf.Session() as sess:
 
         # Rendering the environment slows things down,
         # so let's only look at it once our agent is doing a good job.
-        if episode_number > 500 or rendering == True :
+        if episode_number > 1000 or rendering == True :
             env.render()
             rendering = True
 
@@ -152,7 +165,7 @@ with tf.Session() as sess:
             if done:
                 finished_num += 1
                 print 'wooooo', finished_num
-                if finished_num > 20:
+                if finished_num > 100:
                     rendering = True
             print 'episode: ' + str(episode_number)
             maxPos = -10
@@ -169,13 +182,13 @@ with tf.Session() as sess:
 
             # compute the discounted reward backwards through time
 
-            discounted_epr = discount_rewards(epr)
+            discounted_epr = discount_rewards(epr, epx)
             # If done, we don't count it as loss
             if done:
-                discounted_epr = zero_loss(epr)
+                discounted_epr = rms_reward(epr, epx)
             # size the rewards to be unit normal (helps control the gradient estimator variance)
-            discounted_epr -= np.mean(discounted_epr)
-            if not done:
+#            if not done:
+#                discounted_epr -= np.mean(discounted_epr)
                 discounted_epr /= np.std(discounted_epr)
 
             # Get the gradient for this episode, and save it in the gradBuffer
@@ -192,10 +205,6 @@ with tf.Session() as sess:
                 # Give a summary of how well our network is doing for each batch of episodes.
                 running_reward = reward_sum if running_reward is None else running_reward * 0.99 + reward_sum * 0.01
                 print 'Average reward for episode %f.  Total average reward %f.' % (reward_sum/batch_size, running_reward/batch_size)
-
-                if reward_sum/batch_size > 400:
-                    print "Task solved in",episode_number,'episodes!'
-                    break
 
                 reward_sum = 0
 
