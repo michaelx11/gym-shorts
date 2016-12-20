@@ -6,42 +6,45 @@ import matplotlib.pyplot as plt
 import scipy.misc
 import os
 
+import gym
+env = gym.make('MountainCar-v0')
+
 D = 2
-H = 16
 
 # DQN setup heavily borrowed from: https://medium.com/@awjuliani/simple-reinforcement-learning-with-tensorflow-part-4-deep-q-networks-and-beyond-8438a3e2b8df#.edbzlkx5n
 # What can I say, I need serious learning help
 
 class Qnetwork():
-    def __init__(self,h_size):
+    def __init__(self, h_size, identifier):
+        print "init"
 	# We'll go with fully connected layers
         self.scalarInput =  tf.placeholder(shape=[None,2],dtype=tf.float32)
         
         # V for Value network
-        self.WV1 = tf.get_variable("WV1", shape=[D, H],
+        self.WV1 = tf.get_variable("WV1" + identifier, shape=[D, h_size],
                 initializer=tf.contrib.layers.xavier_initializer())
         # rectified linear unit
-        self.layerV1 = tf.nn.relu(tf.matmul(self.scalarInput,WV1))
-        self.WV2 = tf.get_variable("WV2", shape=[H, H],
+        self.layerV1 = tf.nn.relu(tf.matmul(self.scalarInput,self.WV1))
+        self.WV2 = tf.get_variable("WV2" + identifier, shape=[h_size, h_size],
                 initializer=tf.contrib.layers.xavier_initializer())
-        self.layerV2 = tf.matmul(layerV1, WV2)
-        self.WV3 = tf.get_variable("WV3", shape=[H, 2],
+        self.layerV2 = tf.matmul(self.layerV1, self.WV2)
+        self.WV3 = tf.get_variable("WV3" + identifier, shape=[h_size, 2],
                 initializer=tf.contrib.layers.xavier_initializer())
         # Value!
-        self.Value = tf.matmul(layerV2,WV3)
+        self.Value = tf.matmul(self.layerV2,self.WV3)
 
         # A for Advantage network
-        self.WA1 = tf.get_variable("WA1", shape=[D, H],
+        self.WA1 = tf.get_variable("WA1" + identifier, shape=[D, h_size],
                 initializer=tf.contrib.layers.xavier_initializer())
         # rectified linear unit
-        self.layerA1 = tf.nn.relu(tf.matmul(self.scalarInput,WA1))
-        self.WA2 = tf.get_variable("WA2", shape=[H, H],
+        self.layerA1 = tf.nn.relu(tf.matmul(self.scalarInput,self.WA1))
+        self.WA2 = tf.get_variable("WA2" + identifier, shape=[h_size, h_size],
                 initializer=tf.contrib.layers.xavier_initializer())
-        self.layerA2 = tf.matmul(layerA1, WA2)
-        self.WA3 = tf.get_variable("WA3", shape=[H, 2],
+        self.layerA2 = tf.matmul(self.layerA1, self.WA2)
+        self.WA3 = tf.get_variable("WA3" + identifier, shape=[h_size, 2],
                 initializer=tf.contrib.layers.xavier_initializer())
         # Advantage
-        self.Advantage = tf.matmul(layerA2,WA3)
+        self.Advantage = tf.matmul(self.layerA2,self.WA3)
         
         #Then combine them together to get our final Q-values.
         self.Qout = self.Value + tf.sub(self.Advantage,tf.reduce_mean(self.Advantage,reduction_indices=1,keep_dims=True))
@@ -50,7 +53,7 @@ class Qnetwork():
         #Below we obtain the loss by taking the sum of squares difference between the target and prediction Q values.
         self.targetQ = tf.placeholder(shape=[None],dtype=tf.float32)
         self.actions = tf.placeholder(shape=[None],dtype=tf.int32)
-        self.actions_onehot = tf.one_hot(self.actions,env.actions,dtype=tf.float32)
+        self.actions_onehot = tf.one_hot(self.actions, 2, dtype=tf.float32)
         
         self.Q = tf.reduce_sum(tf.mul(self.Qout, self.actions_onehot), reduction_indices=1)
         
@@ -73,7 +76,7 @@ class experience_buffer():
         return np.reshape(np.array(random.sample(self.buffer,size)),[size,5])
 
 def processState(states):
-    return np.reshape(states,[21168])
+    return np.reshape(states,[D])
 
 def updateTargetGraph(tfVars,tau):
     total_vars = len(tfVars)
@@ -97,12 +100,14 @@ pre_train_steps = 10000 #How many steps of random actions before training begins
 max_epLength = 50 #The max allowed length of our episode.
 load_model = False #Whether to load a saved model.
 path = "./dqn" #The path to save our model to.
-h_size = 512 #The size of the final convolutional layer before splitting it into Advantage and Value streams.
+h_size = 16 #The size of the hidden layers
 tau = 0.001 #Rate to update target network toward primary network
 
 tf.reset_default_graph()
-mainQN = Qnetwork(h_size)
-targetQN = Qnetwork(h_size)
+print 'init one'
+mainQN = Qnetwork(h_size, 'main')
+print 'init two'
+targetQN = Qnetwork(h_size, 'target')
 
 init = tf.initialize_all_variables()
 
@@ -147,10 +152,10 @@ with tf.Session() as sess:
             j+=1
             #Choose an action by greedily (with e chance of random action) from the Q-network
             if np.random.rand(1) < e or total_steps < pre_train_steps:
-                a = np.random.randint(0,4)
+                a = np.random.randint(0,2)
             else:
                 a = sess.run(mainQN.predict,feed_dict={mainQN.scalarInput:[s]})[0]
-            s1,r,d = env.step(a)
+            s1,r,d,_ = env.step(a)
             s1 = processState(s1)
             total_steps += 1
             episodeBuffer.add(np.reshape(np.array([s,a,r,s1,d]),[1,5])) #Save the experience to our episode buffer.
