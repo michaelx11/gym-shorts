@@ -89,15 +89,15 @@ def updateTarget(op_holder,sess):
     for op in op_holder:
         sess.run(op)
 
-batch_size = 32 #How many experiences to use for each training step.
+batch_size = 200 #How many experiences to use for each training step.
 update_freq = 4 #How often to perform a training step.
 y = .99 #Discount factor on the target Q-values
 startE = 1 #Starting chance of random action
 endE = 0.1 #Final chance of random action
-anneling_steps = 10000. #How many steps of training to reduce startE to endE.
+annealing_steps = 10000. #How many steps of training to reduce startE to endE.
 num_episodes = 10000 #How many episodes of game environment to train network with.
 pre_train_steps = 10000 #How many steps of random actions before training begins.
-max_epLength = 50 #The max allowed length of our episode.
+max_epLength = 1000 #The max allowed length of our episode.
 load_model = False #Whether to load a saved model.
 path = "./dqn" #The path to save our model to.
 h_size = 16 #The size of the hidden layers
@@ -121,12 +121,14 @@ myBuffer = experience_buffer()
 
 #Set the rate of random action decrease. 
 e = startE
-stepDrop = (startE - endE)/anneling_steps
+stepDrop = (startE - endE)/annealing_steps
 
 #create lists to contain total rewards and steps per episode
 jList = []
 rList = []
 total_steps = 0
+
+rendering = False
 
 #Make a path for our model to be saved in.
 if not os.path.exists(path):
@@ -140,6 +142,8 @@ with tf.Session() as sess:
     sess.run(init)
     updateTarget(targetOps,sess) #Set the target network to be equal to the primary network.
     for i in range(num_episodes):
+        if i >= 1000:
+            rendering = True
         episodeBuffer = experience_buffer()
         #Reset environment and get first new observation
         s = env.reset()
@@ -148,7 +152,7 @@ with tf.Session() as sess:
         rAll = 0
         j = 0
         #The Q-Network
-        while j < max_epLength: #If the agent takes longer than 200 moves to reach either of the blocks, end the trial.
+        while j < max_epLength:
             j+=1
             #Choose an action by greedily (with e chance of random action) from the Q-network
             if np.random.rand(1) < e or total_steps < pre_train_steps:
@@ -156,6 +160,10 @@ with tf.Session() as sess:
             else:
                 a = sess.run(mainQN.predict,feed_dict={mainQN.scalarInput:[s]})[0]
             s1,r,d,_ = env.step(a)
+            if rendering == True:
+                env.render()
+            if total_steps % 10000 == 0:
+                print 'total steps', total_steps
             s1 = processState(s1)
             total_steps += 1
             episodeBuffer.add(np.reshape(np.array([s,a,r,s1,d]),[1,5])) #Save the experience to our episode buffer.
