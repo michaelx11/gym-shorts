@@ -6,31 +6,42 @@ import matplotlib.pyplot as plt
 import scipy.misc
 import os
 
+D = 2
+H = 16
 
 # DQN setup heavily borrowed from: https://medium.com/@awjuliani/simple-reinforcement-learning-with-tensorflow-part-4-deep-q-networks-and-beyond-8438a3e2b8df#.edbzlkx5n
 # What can I say, I need serious learning help
+
 class Qnetwork():
     def __init__(self,h_size):
 	# We'll go with fully connected layers
         self.scalarInput =  tf.placeholder(shape=[None,2],dtype=tf.float32)
-        self.imageIn = tf.reshape(self.scalarInput,shape=[-1,84,84,3])
-        self.conv1 = tf.contrib.layers.convolution2d( \
-            inputs=self.imageIn,num_outputs=32,kernel_size=[8,8],stride=[4,4],padding='VALID', biases_initializer=None)
-        self.conv2 = tf.contrib.layers.convolution2d( \
-            inputs=self.conv1,num_outputs=64,kernel_size=[4,4],stride=[2,2],padding='VALID', biases_initializer=None)
-        self.conv3 = tf.contrib.layers.convolution2d( \
-            inputs=self.conv2,num_outputs=64,kernel_size=[3,3],stride=[1,1],padding='VALID', biases_initializer=None)
-        self.conv4 = tf.contrib.layers.convolution2d( \
-            inputs=self.conv3,num_outputs=512,kernel_size=[7,7],stride=[1,1],padding='VALID', biases_initializer=None)
         
-        #We take the output from the final convolutional layer and split it into separate advantage and value streams.
-        self.streamAC,self.streamVC = tf.split(3,2,self.conv4)
-        self.streamA = tf.contrib.layers.flatten(self.streamAC)
-        self.streamV = tf.contrib.layers.flatten(self.streamVC)
-        self.AW = tf.Variable(tf.random_normal([h_size/2,env.actions]))
-        self.VW = tf.Variable(tf.random_normal([h_size/2,1]))
-        self.Advantage = tf.matmul(self.streamA,self.AW)
-        self.Value = tf.matmul(self.streamV,self.VW)
+        # V for Value network
+        self.WV1 = tf.get_variable("WV1", shape=[D, H],
+                initializer=tf.contrib.layers.xavier_initializer())
+        # rectified linear unit
+        self.layerV1 = tf.nn.relu(tf.matmul(self.scalarInput,WV1))
+        self.WV2 = tf.get_variable("WV2", shape=[H, H],
+                initializer=tf.contrib.layers.xavier_initializer())
+        self.layerV2 = tf.matmul(layerV1, WV2)
+        self.WV3 = tf.get_variable("WV3", shape=[H, 2],
+                initializer=tf.contrib.layers.xavier_initializer())
+        # Value!
+        self.Value = tf.matmul(layerV2,WV3)
+
+        # A for Advantage network
+        self.WA1 = tf.get_variable("WA1", shape=[D, H],
+                initializer=tf.contrib.layers.xavier_initializer())
+        # rectified linear unit
+        self.layerA1 = tf.nn.relu(tf.matmul(self.scalarInput,WA1))
+        self.WA2 = tf.get_variable("WA2", shape=[H, H],
+                initializer=tf.contrib.layers.xavier_initializer())
+        self.layerA2 = tf.matmul(layerA1, WA2)
+        self.WA3 = tf.get_variable("WA3", shape=[H, 2],
+                initializer=tf.contrib.layers.xavier_initializer())
+        # Advantage
+        self.Advantage = tf.matmul(layerA2,WA3)
         
         #Then combine them together to get our final Q-values.
         self.Qout = self.Value + tf.sub(self.Advantage,tf.reduce_mean(self.Advantage,reduction_indices=1,keep_dims=True))
