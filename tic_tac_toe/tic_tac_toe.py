@@ -67,6 +67,9 @@ class GameEnvironment:
       # Invalid move gets -1
       return (self.board, (row, col), -1, True)
 
+  def getBoard(self):
+    return [list(row) for row in self.board]
+
 if __name__ == '__main__':
   game = GameEnvironment()
   state = (game.board, (0, 0), 0, False)
