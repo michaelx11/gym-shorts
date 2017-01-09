@@ -5,8 +5,9 @@ import pickle
 
 class SarsaLookupAgent:
 
-  LEARNING_FACTOR = .99
+  ALPHA = .01
   DISCOUNT_FACTOR = .99
+  MINIMUM_EPSILON = .10
 
   def __init__(self, modelString=None):
     # Action-value Q is simply a dictionary keyed on concatenated states
@@ -39,9 +40,10 @@ class SarsaLookupAgent:
     self.step += 1
     validMoves = self.getValidMovePairs(oldBoard)
     random.shuffle(validMoves)
-    if random.random() < 1.0 / self.step:
-      # choose random action
-      return random.choice(validMoves)
+    randValue = random.random()
+    if randValue < 1.0 / self.step or randValue < self.MINIMUM_EPSILON:
+      # choose random action, default is 0,0 if no action possible (termination case)
+      return random.choice(validMoves) if len(validMoves) > 0 else (0, 0)
     else:
       maxMoveValue = -10000000
       maxMove = (0, 0)
@@ -57,29 +59,41 @@ class SarsaLookupAgent:
     newQKey = self.getQKey(newState, newAction)
     oldQValue = self.getQValue(oldQKey)
     newQValue = self.getQValue(newQKey)
+#    if oldQValue > 0 or reward != 0 or newQValue > 0:
+#        print oldQValue, reward, newQValue
+#        print oldState, oldAction
+#        print newState, newAction
 
-    self.qs[oldQKey] = oldQValue + self.LEARNING_FACTOR * (reward + self.DISCOUNT_FACTOR * newQValue - oldQValue)
+    self.qs[oldQKey] = oldQValue + self.ALPHA * (reward + self.DISCOUNT_FACTOR * newQValue - oldQValue)
 
   def runEpisode(self, shouldPrint=False, isTraining=False):
     self.game = tic_tac_toe.GameEnvironment()
     randomPlayer = random_player.RandomT3Player(self.game, 'O')
-    state = (self.game.board, (0, 0), 0, False)
+    board = self.game.board
+    action = self.getAction()
+    done = False
+    reward = 0
     # while not done
-    while not state[3]:
-      oldBoard, oldAction = state[:2]
-      movePair = self.getAction()
-      state = self.game.step(movePair[0], movePair[1])
-      newBoard, newAction, reward, done = state
+    while not done:
+      # Take action A, observe R and S'
+      state = self.game.step(action[0], action[1])
       if shouldPrint:
         print 'After P1 move:', self.game.board
-      if isTraining:
-        self.trainStep(oldBoard, oldAction, newBoard, newAction, reward)
-      if done:
-        break
-      randomMove = randomPlayer.chooseMove()
-      state = self.game.step(randomMove[0], randomMove[1])
+      newBoard, newAction, reward, done = state
+      # Adversary moves (environment)
+      if not done:
+        randomMove = randomPlayer.chooseMove()
+        adversaryStep = self.game.step(randomMove[0], randomMove[1])
       if shouldPrint:
         print 'After P2 move:', self.game.board
+      # Recompute action, A', save old action
+      oldAction = action
+      action = self.getAction()
+      # Now do the update equation
+      if isTraining:
+        self.trainStep(board, oldAction, self.game.board, action, reward)
+      # save board state
+      board = self.game.board
     if shouldPrint:
       print state
     return state
@@ -90,11 +104,13 @@ class SarsaLookupAgent:
 if __name__ == '__main__':
   agent = SarsaLookupAgent()
   # Training
-  for i in range(10000):
+  for i in range(1000000):
+    if i % 10000 == 0:
+      print i
     agent.runEpisode(isTraining=True)
 
   # Evaluation
-  numEvals = 1000
+  numEvals = 10000
   numWins = 0
   numTies = 0
   numLosses = 0
