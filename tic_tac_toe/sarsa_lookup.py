@@ -137,6 +137,10 @@ if __name__ == '__main__':
   parser.add_argument('--out_file', help="File to write model to", type=str)
   args = parser.parse_args()
 
+  outputFile = 'model.pickle'
+  if args.out_file:
+    outputFile = args.out_file
+
   if args.play:
     modelFileName = 'model.pickle'
     if args.in_file:
@@ -152,13 +156,15 @@ if __name__ == '__main__':
         modelString = modelFile.read()
         agent = SarsaLookupAgent(modelString=modelString)
     # Training
-    for i in range(5000000):
-      if i % 10000 == 0:
+    for i in range(50000000):
+      if i % 100000 == 0:
+        with open(outputFile, 'w') as f:
+          f.write(agent.getModelString())
         print i
       agent.runEpisode(isTraining=True)
 
     # Evaluation
-    numEvals = 10000
+    numEvals = 100000
     numWins = 0
     numTies = 0
     numLosses = 0
@@ -176,9 +182,6 @@ if __name__ == '__main__':
       print '\n\n\n\n-- Game: {} --\n\n'.format(i)
       agent.runEpisode(shouldPrint=True)
 
-    outputFile = 'model.pickle'
-    if args.out_file:
-      outputFile = args.out_file
     with open(outputFile, 'w') as f:
       f.write(agent.getModelString())
 
