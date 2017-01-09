@@ -37,7 +37,7 @@ class SarsaLookupAgent:
 
   # Choose action via epsilon-greedy approach
   def getAction(self):
-    oldBoard = self.game.board
+    oldBoard = self.game.getBoard()
     self.step += 1
     validMoves = self.getValidMovePairs(oldBoard)
     randValue = random.random()
@@ -69,7 +69,7 @@ class SarsaLookupAgent:
   def runEpisode(self, shouldPrint=False, isTraining=False):
     self.game = tic_tac_toe.GameEnvironment()
     randomPlayer = random_player.RandomT3Player(self.game, 'O')
-    board = self.game.board
+    board = self.game.getBoard()
     action = self.getAction()
     done = False
     reward = 0
@@ -78,14 +78,14 @@ class SarsaLookupAgent:
       # Take action A, observe R and S'
       state = self.game.step(action[0], action[1])
       if shouldPrint:
-        print 'After P1 move:', self.game.board
+        print 'After P1 move:', self.game.getBoard()
       newBoard, newAction, reward, done = state
       # Adversary moves (environment)
       if not done:
         randomMove = randomPlayer.chooseMove()
         adversaryStep = self.game.step(randomMove[0], randomMove[1])
       if shouldPrint:
-        print 'After P2 move:', self.game.board
+        print 'After P2 move:', self.game.getBoard()
       # If the opponent wins, we need to replace the reward
       if not done and adversaryStep[3]:
         reward = adversaryStep[2]
@@ -96,33 +96,33 @@ class SarsaLookupAgent:
       action = self.getAction()
       # Now do the update equation
       if isTraining:
-        self.trainStep(board, oldAction, self.game.board, action, reward)
+        self.trainStep(board, oldAction, self.game.getBoard(), action, reward)
       # save board state
-      board = self.game.board
+      board = self.game.getBoard()
     if shouldPrint:
       print state
     return state
 
   def playGameWithUser(self):
     self.game = tic_tac_toe.GameEnvironment()
-    board = self.game.board
-    state = (self.game.board, (0,0), 0, False)
+    board = self.game.getBoard()
+    state = (self.game.getBoard(), (0,0), 0, False)
     action = self.getAction()
     # while not done
     while not state[3]:
       # Take action A, observe R and S'
       state = self.game.step(action[0], action[1])
-      print 'After P1 move:', self.game.board
+      print 'After P1 move:', self.game.getBoard()
       # Adversary moves (environment)
       if not state[3]:
         print 'move? r,c:'
         randomMove = map(int, raw_input().split(','))
         state = adversaryStep = self.game.step(randomMove[0], randomMove[1])
-      print 'After P2 move:', self.game.board
+      print 'After P2 move:', self.game.getBoard()
       # Recompute action, A', save old action
       action = self.getAction()
       # save board state
-      board = self.game.board
+      board = self.game.getBoard()
     print state
     return state
 
