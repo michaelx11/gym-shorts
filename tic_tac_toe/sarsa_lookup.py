@@ -38,6 +38,7 @@ class SarsaLookupAgent:
     oldBoard = self.game.board
     self.step += 1
     validMoves = self.getValidMovePairs(oldBoard)
+    random.shuffle(validMoves)
     if random.random() < 1.0 / self.step:
       # choose random action
       return random.choice(validMoves)
@@ -111,6 +112,6 @@ if __name__ == '__main__':
     print '\n\n\n\n-- Game: {} --\n\n'.format(i)
     agent.runEpisode(shouldPrint=True)
 
-  print agent.qs
-  print agent.getModelString()
+  with open('model.pickle', 'w') as f:
+    f.write(agent.getModelString())
 
