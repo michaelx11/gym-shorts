@@ -86,6 +86,11 @@ class SarsaLookupAgent:
         adversaryStep = self.game.step(randomMove[0], randomMove[1])
       if shouldPrint:
         print 'After P2 move:', self.game.board
+      # If the opponent wins, we need to replace the reward
+      if not done and adversaryStep[3]:
+        reward = adversaryStep[2]
+        done = True
+        state = adversaryStep
       # Recompute action, A', save old action
       oldAction = action
       action = self.getAction()
@@ -101,23 +106,20 @@ class SarsaLookupAgent:
   def playGameWithUser(self):
     self.game = tic_tac_toe.GameEnvironment()
     board = self.game.board
+    state = (self.game.board, (0,0), 0, False)
     action = self.getAction()
-    done = False
-    reward = 0
     # while not done
-    while not done:
+    while not state[3]:
       # Take action A, observe R and S'
       state = self.game.step(action[0], action[1])
       print 'After P1 move:', self.game.board
-      newBoard, newAction, reward, done = state
       # Adversary moves (environment)
-      if not done:
+      if not state[3]:
         print 'move? r,c:'
         randomMove = map(int, raw_input().split(','))
-        adversaryStep = self.game.step(randomMove[0], randomMove[1])
+        state = adversaryStep = self.game.step(randomMove[0], randomMove[1])
       print 'After P2 move:', self.game.board
       # Recompute action, A', save old action
-      oldAction = action
       action = self.getAction()
       # save board state
       board = self.game.board
@@ -150,7 +152,7 @@ if __name__ == '__main__':
         modelString = modelFile.read()
         agent = SarsaLookupAgent(modelString=modelString)
     # Training
-    for i in range(1000000):
+    for i in range(5000000):
       if i % 10000 == 0:
         print i
       agent.runEpisode(isTraining=True)
