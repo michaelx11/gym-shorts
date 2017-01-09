@@ -6,8 +6,8 @@ import pickle
 class SarsaLookupAgent:
 
   ALPHA = .01
-  DISCOUNT_FACTOR = .99
-  MINIMUM_EPSILON = .10
+  DISCOUNT_FACTOR = .90
+  MINIMUM_EPSILON = .01
 
   def __init__(self, modelString=None):
     # Action-value Q is simply a dictionary keyed on concatenated states
@@ -39,7 +39,6 @@ class SarsaLookupAgent:
     oldBoard = self.game.board
     self.step += 1
     validMoves = self.getValidMovePairs(oldBoard)
-    random.shuffle(validMoves)
     randValue = random.random()
     if randValue < 1.0 / self.step or randValue < self.MINIMUM_EPSILON:
       # choose random action, default is 0,0 if no action possible (termination case)
@@ -104,7 +103,7 @@ class SarsaLookupAgent:
 if __name__ == '__main__':
   agent = SarsaLookupAgent()
   # Training
-  for i in range(1000000):
+  for i in range(10000000):
     if i % 10000 == 0:
       print i
     agent.runEpisode(isTraining=True)
