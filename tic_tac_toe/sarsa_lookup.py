@@ -2,6 +2,7 @@ import tic_tac_toe
 import random_player
 import random
 import pickle
+import argparse
 
 class SarsaLookupAgent:
 
@@ -97,36 +98,85 @@ class SarsaLookupAgent:
       print state
     return state
 
+  def playGameWithUser(self):
+    self.game = tic_tac_toe.GameEnvironment()
+    board = self.game.board
+    action = self.getAction()
+    done = False
+    reward = 0
+    # while not done
+    while not done:
+      # Take action A, observe R and S'
+      state = self.game.step(action[0], action[1])
+      print 'After P1 move:', self.game.board
+      newBoard, newAction, reward, done = state
+      # Adversary moves (environment)
+      if not done:
+        print 'move? r,c:'
+        randomMove = map(int, raw_input().split(','))
+        adversaryStep = self.game.step(randomMove[0], randomMove[1])
+      print 'After P2 move:', self.game.board
+      # Recompute action, A', save old action
+      oldAction = action
+      action = self.getAction()
+      # save board state
+      board = self.game.board
+    print state
+    return state
+
   def getModelString(self):
     return pickle.dumps((self.qs, self.step))
 
 if __name__ == '__main__':
-  agent = SarsaLookupAgent()
-  # Training
-  for i in range(10000000):
-    if i % 10000 == 0:
-      print i
-    agent.runEpisode(isTraining=True)
+  parser = argparse.ArgumentParser()
 
-  # Evaluation
-  numEvals = 10000
-  numWins = 0
-  numTies = 0
-  numLosses = 0
-  for i in range(numEvals):
-    _, _, reward, _ = agent.runEpisode()
-    if reward == -1:
-      numLosses += 1
-    elif reward == 0:
-      numTies += 1
-    elif reward == 1:
-      numWins += 1
-  print numWins, numTies, numLosses
+  parser.add_argument('--play', help="Start user interactive session against agent", action="store_true")
+  parser.add_argument('--in_file', help="File to load model from", type=str)
+  parser.add_argument('--out_file', help="File to write model to", type=str)
+  args = parser.parse_args()
 
-  for i in range(5):
-    print '\n\n\n\n-- Game: {} --\n\n'.format(i)
-    agent.runEpisode(shouldPrint=True)
+  if args.play:
+    modelFileName = 'model.pickle'
+    if args.in_file:
+      modelFileName = args.in_file
+    with open(modelFileName, 'r') as modelFile:
+      modelString = modelFile.read()
+      agent = SarsaLookupAgent(modelString=modelString)
+      agent.playGameWithUser()
+  else:
+    agent = SarsaLookupAgent()
+    if args.in_file:
+      with open(args.in_file, 'r') as modelFile:
+        modelString = modelFile.read()
+        agent = SarsaLookupAgent(modelString=modelString)
+    # Training
+    for i in range(1000000):
+      if i % 10000 == 0:
+        print i
+      agent.runEpisode(isTraining=True)
 
-  with open('model.pickle', 'w') as f:
-    f.write(agent.getModelString())
+    # Evaluation
+    numEvals = 10000
+    numWins = 0
+    numTies = 0
+    numLosses = 0
+    for i in range(numEvals):
+      _, _, reward, _ = agent.runEpisode()
+      if reward == -1:
+        numLosses += 1
+      elif reward == 0:
+        numTies += 1
+      elif reward == 1:
+        numWins += 1
+    print numWins, numTies, numLosses
+
+    for i in range(5):
+      print '\n\n\n\n-- Game: {} --\n\n'.format(i)
+      agent.runEpisode(shouldPrint=True)
+
+    outputFile = 'model.pickle'
+    if args.out_file:
+      outputFile = args.out_file
+    with open(outputFile, 'w') as f:
+      f.write(agent.getModelString())
 
